@@ -28,16 +28,16 @@ int main(int argc, char *argv[]) {
 
 
 		if (strcmp(argv[1], "-g") == 0) {
-			printf("argv1 = %s\n", argv[1]);
+			//printf("argv1 = %s\n", argv[1]);
 
-			//Create graph and hash data. Optional to pass rootNode in instead of DEFAULT
+			//Create graph and hash data. Optional to pass new target
 			readFile(argv[2], argv[3]);
 
 		} else if (strcmp(argv[1], "-c") == 0) {
 
 			//Compile code and check value
 			//Call function compile ();
-			printf("I made it to c\n");
+			//printf("I made it to c\n");
 
 		} else {
 			printf("Wrong flag entered\n");
