@@ -10,8 +10,7 @@
 #include <string.h>
 #include "generate.h"
 
-int readLine(FILE* file, char* buf, int bufSize)
-{
+int readLine(FILE* file, char* buf, int bufSize) {
 	char* ptr = buf;
 	while (bufSize > 1) {
 		if (fread(buf, 1, 1, file) == 0) {
@@ -30,20 +29,7 @@ int readLine(FILE* file, char* buf, int bufSize)
 	}
 	*buf = 0;
 	return 0;
-	//printf("Line Count= %d\n", linesRead);
 
-	//	char* retVal = NULL;
-	//	int i;
-		//	while((retVal = fgets(buf, bufSize, file)) != NULL && *retVal != '\n') //for all lines in file
-	//	for (i = 0; i < linesRead; i++) {
-	//		retVal = fgets(buf, bufSize, file);
-	//		printf("Buffer= %s\n", buf);
-	//	}
-	//	if (retVal == NULL) {
-	//		*buf = 0;
-	//		return 1;
-	//	}
-	//	printf("Buffer= %s\n", buf);
 }
 
 
@@ -244,6 +230,38 @@ int addSubTreeToParent(struct Node *subTree, struct Node *parent)
 	return 1;
 }
 
+void resetTarget(const char* targetName, struct Node* root)
+{
+	//Change target name
+	int size = strlen(targetName);
+	char* oldName = root->nodeName;
+	root->nodeName = (char*)malloc(size + 1);
+	memcpy(root->nodeName, targetName, size);
+	*(root->nodeName + size) = 0;
+	//Change target command
+	if (root->command != NULL)
+	{
+		//Need to find starting point and replace name with new one
+		char* p1 = strstr(root->command, oldName);
+		if (p1 != NULL)
+		{
+			int ln1 = strlen(root->command);
+			int newSize = ln1 + size - strlen(oldName);
+			char* ptr = (char*)malloc(newSize + 1);
+			memcpy(ptr, root->command, p1 - root->command);
+			memcpy(ptr + (p1 - root->command), targetName, size);
+			if (newSize - size - (p1 - root->command) > 1)
+				memcpy(ptr + (p1 - root->command) + size, p1 + strlen(oldName), newSize - size - (p1 - root->command));
+
+			*(ptr + newSize) = 0;
+			free(root->command);
+			root->command = ptr;
+		}
+	}
+
+	free(oldName);
+}
+
 struct Node* readFile(const char *filename, const char *target) {
 	//Read in remodelfile and check for new target
 	char lineBuf[2048];
@@ -264,11 +282,17 @@ struct Node* readFile(const char *filename, const char *target) {
 
 			if (root == NULL)
 				root = ptr;
-			else
+			else {
 				addSubTreeToParent(ptr, root);
+			}
 		}
+		//Change target to one given in command argument
+		if (target != NULL)
+			resetTarget(target, root);
 	}
 	fclose(file);
 	return root;
 }
+
+
 
