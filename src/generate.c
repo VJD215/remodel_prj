@@ -8,6 +8,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
+#include <stdbool.h>
 #include "generate.h"
 
 int readLine(FILE* file, char* buf, int bufSize) {
@@ -133,6 +135,8 @@ int parse(char *buffer, char **target, char ***dependency, int *numChild, char *
 			p2--;
 
 		if (p2 == ptr - 1)
+			p2++;
+		if(p2 != ptr)
 			p2++;
 	}
 
@@ -262,7 +266,72 @@ void resetTarget(const char* targetName, struct Node* root)
 	free(oldName);
 }
 
-struct Node* readFile(const char *filename, const char *target) {
+void* workThread(void* cmdPath) {
+	//Run the command that is given
+	system(cmdPath);
+	return NULL;
+}
+
+bool createThread(char* cmdPath, pthread_t *pt) {
+	//Create a thread for each call
+	if (pthread_create(&pt, NULL, &workThread, (void*) cmdPath) != 0)
+		return 1;
+	if (pthread_join(pt, NULL) != 0)
+		return 1;
+
+	return 0;
+	pthread_exit(NULL);
+}
+
+void runMD5(struct Node* node, const char *fPath) {
+	pthread_t pt;
+	if (node->child != NULL)
+		runMD5(node->child, fPath);
+
+	char *fileExt = strrchr(node->nodeName, '.');
+	if ((strcmp(fileExt, ".cpp") == 0) || (strcmp(fileExt, ".o") == 0)) {
+
+		char bufMd5[2048];
+		// build this md5sum filename > md5.txt
+
+		strcpy(bufMd5, "md5sum");
+		strcat(bufMd5, " ");
+		strcat(bufMd5, node->nodeName);
+		strcat(bufMd5, " > .remodel/md5.txt");
+
+		if (createThread(bufMd5, &pt))
+			return 1;
+
+		if (node->next != NULL)
+			runMD5(node->next, fPath);
+	}
+
+}
+
+
+
+
+void runCmd(struct Node* node, const char *fPath) {
+	//Run the commands for each node in parallel
+	pthread_t pt;
+	if (node->child != NULL)
+		runCmd(node->child, fPath);
+
+	if (node->command != NULL) {
+		char buf[2048];
+		int fPathSize = strlen(fPath);
+		strcpy(buf, node->command);
+
+		if (createThread(buf, &pt))
+			return 1;
+
+		if (node->next != NULL)
+			runCmd(node->next, fPath);
+
+	}
+}
+
+struct Node* readFile(const char *filename, const char *target, const char *fPath) {
 	//Read in remodelfile and check for new target
 	char lineBuf[2048];
 	struct Node* root = NULL;
@@ -289,10 +358,18 @@ struct Node* readFile(const char *filename, const char *target) {
 		//Change target to one given in command argument
 		if (target != NULL)
 			resetTarget(target, root);
+
+		runCmd(root, fPath);
+		printf("I made it to command\n");
+
+		runMD5(root, fPath);
+		printf("I made it to md5\n");
 	}
 	fclose(file);
 	return root;
 }
+
+
 
 
 
