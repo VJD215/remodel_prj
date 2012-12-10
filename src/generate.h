@@ -8,6 +8,8 @@
 #ifndef GENERATE_H_
 #define GENERATE_H_
 
+extern int counter;
+
 struct Node
 {
     char *nodeName;
@@ -19,7 +21,8 @@ struct Node
     char *command;
 };
 
+int system(const char *);
 
-struct Node* readFile(const char *, const char *);
+struct Node* readFile(const char *, const char *, const char *);
 
 #endif /* GENERATE_H_ */

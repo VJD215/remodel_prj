@@ -10,7 +10,10 @@
 #include <string.h>
 #include <pthread.h>
 #include <stdbool.h>
+#include <sys/stat.h>
 #include "generate.h"
+
+int counter=0;
 
 int readLine(FILE* file, char* buf, int bufSize) {
 	char* ptr = buf;
@@ -266,14 +269,58 @@ void resetTarget(const char* targetName, struct Node* root)
 	free(oldName);
 }
 
-void* workThread(void* cmdPath) {
+void resetCommand(struct Node* node, const char *fPath) {
+	//Add path to file
+	//Need to find starting point in g++ -c fileName.cpp
+	int pl = strlen(fPath);
+
+	if (node->command != NULL) {
+		char *ptr = node->nodeName;
+		char *getName = strrchr(node->nodeName, '.');
+		int nameSize = getName - ptr;
+		char *searchName = (char*) malloc(nameSize);
+		memcpy(searchName, ptr, nameSize);
+		//Find starting point in command
+		int cl = strlen(node->command);
+		char *ptr1 = node->command;
+		char *start = ptr1;
+
+		while (*ptr1 != '.') {
+			ptr1++;
+
+			if (*ptr1 == 'c')
+				ptr1++;
+		}
+		if (ptr1 != NULL) {
+
+			int newSize = pl + cl;
+			char* ptr2 = (char*) malloc(newSize + 1);
+			int cPt = ptr1 - start - nameSize;
+			memcpy(ptr2, node->command, cPt);
+			strcat(ptr2, fPath);
+			strcat(ptr2, searchName);
+			strcat(ptr2, ptr1);
+
+			free(node->command);
+			node->command = ptr2;
+
+		}
+	}
+}
+
+
+//void* workThread(void* cmdPath) {
+int* workThread(void* cmdPath) {
 	//Run the command that is given
-	system(cmdPath);
-	return NULL;
+
+	if (system(cmdPath) != 0)
+		return 1;
+
 }
 
 bool createThread(char* cmdPath, pthread_t *pt) {
 	//Create a thread for each call
+
 	if (pthread_create(&pt, NULL, &workThread, (void*) cmdPath) != 0)
 		return 1;
 	if (pthread_join(pt, NULL) != 0)
@@ -283,33 +330,37 @@ bool createThread(char* cmdPath, pthread_t *pt) {
 	pthread_exit(NULL);
 }
 
-void runMD5(struct Node* node, const char *fPath) {
+int runMD5(struct Node* node, const char *fPath, int counter) {
 	pthread_t pt;
 	if (node->child != NULL)
-		runMD5(node->child, fPath);
+		runMD5(node->child, fPath, counter);
 
-	char *fileExt = strrchr(node->nodeName, '.');
-	if ((strcmp(fileExt, ".cpp") == 0) || (strcmp(fileExt, ".o") == 0)) {
-
-		char bufMd5[2048];
-		// build this md5sum filename > md5.txt
-
-		strcpy(bufMd5, "md5sum");
+	char bufMd5[2048];
+	// build this md5sum filename > .remodel/md5.txt
+	if (counter == 0) {
+		strcpy(bufMd5, "\"");
+		strcat(bufMd5, "md5sum");
 		strcat(bufMd5, " ");
 		strcat(bufMd5, node->nodeName);
 		strcat(bufMd5, " > .remodel/md5.txt");
+		strcat(bufMd5, "\"");
+		counter++;
+	} else {
+		strcpy(bufMd5, "\"");
+		strcat(bufMd5, "md5sum");
+		strcat(bufMd5, " ");
+		strcat(bufMd5, node->nodeName);
+		strcat(bufMd5, " >> .remodel/md5.txt");
+		strcat(bufMd5, "\"");
 
-		if (createThread(bufMd5, &pt))
-			return 1;
-
-		if (node->next != NULL)
-			runMD5(node->next, fPath);
 	}
 
+	if (createThread(bufMd5, &pt))
+		return 1;
+
+	if (node->next != NULL)
+		runMD5(node->next, fPath, counter);
 }
-
-
-
 
 void runCmd(struct Node* node, const char *fPath) {
 	//Run the commands for each node in parallel
@@ -319,7 +370,14 @@ void runCmd(struct Node* node, const char *fPath) {
 
 	if (node->command != NULL) {
 		char buf[2048];
-		int fPathSize = strlen(fPath);
+
+		char *sourceExt = strchr(node->nodeName, '.');
+		if (sourceExt != NULL) {
+
+			if ((strcmp(sourceExt, ".cpp") == 0) || (strcmp(sourceExt, ".o")
+					== 0))
+				resetCommand(node, fPath);
+		}
 		strcpy(buf, node->command);
 
 		if (createThread(buf, &pt))
@@ -327,11 +385,11 @@ void runCmd(struct Node* node, const char *fPath) {
 
 		if (node->next != NULL)
 			runCmd(node->next, fPath);
-
 	}
+
 }
 
-struct Node* readFile(const char *filename, const char *target, const char *fPath) {
+struct Node* readFile(const char *filename, const char *target,	const char *fPath) {
 	//Read in remodelfile and check for new target
 	char lineBuf[2048];
 	struct Node* root = NULL;
@@ -359,11 +417,41 @@ struct Node* readFile(const char *filename, const char *target, const char *fPat
 		if (target != NULL)
 			resetTarget(target, root);
 
-		runCmd(root, fPath);
-		printf("I made it to command\n");
 
-		runMD5(root, fPath);
-		printf("I made it to md5\n");
+		char *dirName = ".remodel";
+		char *fileName = ".remodel/md5.txt";
+		struct stat *st;
+
+		st = malloc(sizeof(struct stat));
+
+		if (stat(dirName, &st) == 0) {
+			printf(".remodel is present\n");
+		} else {
+			system("mkdir .remodel");
+		}
+
+		if (stat(fileName, &st) == 0) {
+			printf(".remodel/md5.txt is present\n");
+			FILE *cmd = popen("md5sum -c .remodel/md5.txt", "r");
+			char result[2048];
+			while (fgets(result, sizeof(result), cmd) != NULL)
+				printf("%s\n", result);
+			pclose(cmd);
+
+			// run a parser on the array and only look for FAIL results
+			// If failed result is found get filename
+			// set the statusFlag for each nodeName found
+
+			runCmd(root, fPath);
+			runMD5(root, fPath, counter);
+
+		} else {
+
+			runCmd(root, fPath);
+			runMD5(root, fPath, counter);
+
+		}
+		free(st);
 	}
 	fclose(file);
 	return root;

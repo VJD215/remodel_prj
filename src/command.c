@@ -9,10 +9,13 @@
 #include <string.h>
 #include "generate.h"
 
+
+
+
 int main(int argc, char *argv[]) {
 
-	if (argc < 3 && argc > 4) {
-		// remodel [-g] [-c] [remodelfile] and optional [target] should be arguments
+	if (argc < 2 && argc > 3) {
+		// remodel [remodelfile] and optional [target] should be arguments
 		printf("Please type correct syntax\n");
 	} else {
 
@@ -21,10 +24,9 @@ int main(int argc, char *argv[]) {
 		char *fName = strrchr(argv[0], '/');
 		*fName++;
 		int fNameSize = strlen(fName);
-		char *fPath = (char*)malloc(pathSize + 1);
-		memcpy(fPath, relStart, pathSize -fNameSize);
-		*(fPath + pathSize -fNameSize) = 0;
-
+		char *fPath = (char*) malloc(pathSize + 1);
+		memcpy(fPath, relStart, pathSize - fNameSize);
+		*(fPath + pathSize - fNameSize) = 0;
 
 		if (strcmp(fName, "remodel") != 0) {
 			//Looking for command remodel
@@ -32,19 +34,8 @@ int main(int argc, char *argv[]) {
 
 		}
 
-		if (strcmp(argv[1], "-g") == 0) {
-
-			//Create graph and hash data. Optional to pass new target
-			readFile(argv[2], argv[3], fPath);
-
-		} else if (strcmp(argv[1], "-c") == 0) {
-
-			//Compile code and check value
-			//readFile(argv[2], argv[3]);
-
-		} else {
-			printf("Wrong flag entered\n");
-		}
+		//Create graph and hash data. Optional to pass new target
+		readFile(argv[1], argv[2], fPath);
 
 	}
 

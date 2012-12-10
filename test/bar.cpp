@@ -16,6 +16,7 @@ void add2Number(){
 
 	i++;
 	i++;
+	i++;
 	printf("Adding a number %d\n", i);
 
 }

@@ -7,6 +7,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include "foo.h"
 
 
 void addNumber(){
@@ -16,5 +17,10 @@ void addNumber(){
 
 	i++;
 	printf("Adding a number %d\n", i);
+
+}
+int main (){
+	addNumber;
+	add2Number;
 
 }
