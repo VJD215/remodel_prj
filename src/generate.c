@@ -398,12 +398,23 @@ void runCmd(struct Node* node, const char *fPath) {
 			if ((strcmp(sourceExt, ".cpp") == 0) || (strcmp(sourceExt, ".o")
 					== 0))
 				resetCommand(node, fPath);
+		} else {
+
+			//Need to fix other string and remove ""
+			const char *src = strrchr(node->command, 'g');
+			if (src != NULL) {
+				//src--;
+				const char *dsc = strrchr(src, '"');
+				int endl = dsc - src;
+				char* iptr = (char*) malloc(endl + 1);
+				memset(iptr, 0, endl);
+				memcpy(iptr, src, endl);
+				iptr[endl] = 0;
+				node->command = iptr;
+			}
 		}
-		//Need to fix other string and remove ""
 
-
-
-		sprintf(buf, "%s", node->command);
+		sprintf(buf,"%s", node->command);
 
 		if (createThread(buf, &pt))
 			return 1;
