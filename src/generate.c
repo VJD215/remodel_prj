@@ -13,7 +13,7 @@
 #include <sys/stat.h>
 #include "generate.h"
 
-int counter=0;
+static int counter= 0;
 
 int readLine(FILE* file, char* buf, int bufSize) {
 	char* ptr = buf;
@@ -279,6 +279,7 @@ void resetCommand(struct Node* node, const char *fPath) {
 		char *getName = strrchr(node->nodeName, '.');
 		int nameSize = getName - ptr;
 		char *searchName = (char*) malloc(nameSize);
+		memset(searchName, 0, sizeof(nameSize));
 		memcpy(searchName, ptr, nameSize);
 		//Find starting point in command
 		int cl = strlen(node->command);
@@ -295,14 +296,30 @@ void resetCommand(struct Node* node, const char *fPath) {
 
 			int newSize = pl + cl;
 			char* ptr2 = (char*) malloc(newSize + 1);
+			memset(ptr2, 0, sizeof(node->command + 1));
 			int cPt = ptr1 - start - nameSize;
 			memcpy(ptr2, node->command, cPt);
-			strcat(ptr2, fPath);
-			strcat(ptr2, searchName);
-			strcat(ptr2, ptr1);
+
+			char *getName2 = strrchr(ptr2, '"');
+			getName2++;
+
+			char *getName1 = strrchr(ptr1, '"');
+			getName1--;
+
+			int endl = getName1 - ptr1;
+			char* ptr4 = (char*) malloc(endl + 1);
+			memset(ptr4, 0, (endl + 1));
+			memcpy(ptr4, ptr1, endl + 1);
+
+			int cmdl = strlen(getName) + pl + strlen(searchName) + strlen(ptr4);
+
+			char* ptr3 = (char*) malloc(cmdl + 1);
+			memset(ptr3, 0, sizeof(cmdl + 1));
+
+			sprintf(ptr3, "%s%s%s%s", getName2, fPath, searchName, ptr4);
 
 			free(node->command);
-			node->command = ptr2;
+			node->command = ptr3;
 
 		}
 	}
@@ -310,12 +327,23 @@ void resetCommand(struct Node* node, const char *fPath) {
 
 
 //void* workThread(void* cmdPath) {
-int* workThread(void* cmdPath) {
+void* workThread(void* cmdPath) {
 	//Run the command that is given
+	/*
 
 	if (system(cmdPath) != 0)
 		return 1;
-
+	return 0;
+	*/
+	FILE *cmd = popen(cmdPath, "r");
+    if ( cmd == 0 ) {
+        printf( "Could not execute\n" );
+        return NULL;
+    }
+	char result[2048];
+	while (fgets(result, sizeof(result), cmd) != NULL)
+		printf("%s\n", result);
+	pclose(cmd);
 }
 
 bool createThread(char* cmdPath, pthread_t *pt) {
@@ -330,46 +358,39 @@ bool createThread(char* cmdPath, pthread_t *pt) {
 	pthread_exit(NULL);
 }
 
-int runMD5(struct Node* node, const char *fPath, int counter) {
+int runMD5(struct Node* node, const char *fPath) {
 	pthread_t pt;
 	if (node->child != NULL)
-		runMD5(node->child, fPath, counter);
+		runMD5(node->child, fPath);
+	//sprintf("/usr/bin/md5sum %s > .remodel/md5.txt", node->nodeName);
 
 	char bufMd5[2048];
+	memset(bufMd5, 0, sizeof(bufMd5));
 	// build this md5sum filename > .remodel/md5.txt
 	if (counter == 0) {
-		strcpy(bufMd5, "\"");
-		strcat(bufMd5, "md5sum");
-		strcat(bufMd5, " ");
-		strcat(bufMd5, node->nodeName);
-		strcat(bufMd5, " > .remodel/md5.txt");
-		strcat(bufMd5, "\"");
+		sprintf(bufMd5,"md5sum %s%s > .remodel/md5.txt", fPath, node->nodeName);
 		counter++;
 	} else {
-		strcpy(bufMd5, "\"");
-		strcat(bufMd5, "md5sum");
-		strcat(bufMd5, " ");
-		strcat(bufMd5, node->nodeName);
-		strcat(bufMd5, " >> .remodel/md5.txt");
-		strcat(bufMd5, "\"");
-
+		sprintf(bufMd5,"md5sum %s%s >> .remodel/md5.txt", fPath, node->nodeName);
 	}
 
 	if (createThread(bufMd5, &pt))
 		return 1;
 
 	if (node->next != NULL)
-		runMD5(node->next, fPath, counter);
+		runMD5(node->next, fPath);
 }
 
 void runCmd(struct Node* node, const char *fPath) {
 	//Run the commands for each node in parallel
 	pthread_t pt;
+
 	if (node->child != NULL)
 		runCmd(node->child, fPath);
 
 	if (node->command != NULL) {
 		char buf[2048];
+		memset(buf, 0, sizeof(buf));
 
 		char *sourceExt = strchr(node->nodeName, '.');
 		if (sourceExt != NULL) {
@@ -378,7 +399,11 @@ void runCmd(struct Node* node, const char *fPath) {
 					== 0))
 				resetCommand(node, fPath);
 		}
-		strcpy(buf, node->command);
+		//Need to fix other string and remove ""
+
+
+
+		sprintf(buf, "%s", node->command);
 
 		if (createThread(buf, &pt))
 			return 1;
@@ -443,15 +468,15 @@ struct Node* readFile(const char *filename, const char *target,	const char *fPat
 			// set the statusFlag for each nodeName found
 
 			runCmd(root, fPath);
-			runMD5(root, fPath, counter);
+			runMD5(root, fPath);
 
 		} else {
 
 			runCmd(root, fPath);
-			runMD5(root, fPath, counter);
+			runMD5(root, fPath);
 
 		}
-		free(st);
+		//free(st);
 	}
 	fclose(file);
 	return root;

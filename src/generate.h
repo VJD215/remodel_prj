@@ -8,7 +8,7 @@
 #ifndef GENERATE_H_
 #define GENERATE_H_
 
-extern int counter;
+
 
 struct Node
 {
