@@ -237,6 +237,21 @@ int addSubTreeToParent(struct Node *subTree, struct Node *parent)
 	return 1;
 }
 
+void setStatus(struct Node* node) {
+
+	if (node->child != NULL)
+		setStatus(node->child);
+
+	if (node->statusFlag == 0) {
+		node->statusFlag = 1;
+
+		if (node->next != NULL)
+			setStatus(node->next);
+	}
+
+}
+
+
 void resetTarget(const char* targetName, struct Node* root)
 {
 	//Change target name
@@ -268,6 +283,53 @@ void resetTarget(const char* targetName, struct Node* root)
 
 	free(oldName);
 }
+
+
+int treeSearch(struct Node* node, char * nameValue) {
+	if (strcmp(node->nodeName, nameValue) == 0) {
+		node->statusFlag = 0;
+		while (1) {
+			if (node->parentNode != NULL) {
+				node->statusFlag = 0;
+				return 0;
+			}
+		}
+
+	}
+
+if (node->child != NULL) {
+	if (treeSearch(node->child, nameValue) == 0)
+	return 0;
+}
+
+if (node->next != NULL) {
+	if (treeSearch(node->next, nameValue) == 0)
+	return 0;
+}
+
+return 1;
+}
+
+int treeSearchDups(struct Node* node, char *name, char *command) {
+	if (strcmp(node->nodeName, name) && strcmp(node->command, command)!=0) {
+		node->statusFlag = 1;
+		printf("Duplicate found not processing %s\n", node->nodeName);
+
+	}
+
+if (node->child != NULL) {
+	if (treeSearch(node->child, name) == 0)
+	return 0;
+}
+
+if (node->next != NULL) {
+	if (treeSearch(node->next, name) == 0)
+	return 0;
+}
+
+return 1;
+}
+
 
 void resetCommand(struct Node* node, const char *fPath) {
 	//Add path to file
@@ -326,15 +388,10 @@ void resetCommand(struct Node* node, const char *fPath) {
 }
 
 
-//void* workThread(void* cmdPath) {
+
 void* workThread(void* cmdPath) {
 	//Run the command that is given
-	/*
 
-	if (system(cmdPath) != 0)
-		return 1;
-	return 0;
-	*/
 	FILE *cmd = popen(cmdPath, "r");
     if ( cmd == 0 ) {
         printf( "Could not execute\n" );
@@ -344,6 +401,7 @@ void* workThread(void* cmdPath) {
 	while (fgets(result, sizeof(result), cmd) != NULL)
 		printf("%s\n", result);
 	pclose(cmd);
+	pthread_exit(0);
 }
 
 bool createThread(char* cmdPath, pthread_t *pt) {
@@ -355,14 +413,13 @@ bool createThread(char* cmdPath, pthread_t *pt) {
 		return 1;
 
 	return 0;
-	pthread_exit(NULL);
+
 }
 
 int runMD5(struct Node* node, const char *fPath) {
 	pthread_t pt;
 	if (node->child != NULL)
 		runMD5(node->child, fPath);
-	//sprintf("/usr/bin/md5sum %s > .remodel/md5.txt", node->nodeName);
 
 	char bufMd5[2048];
 	memset(bufMd5, 0, sizeof(bufMd5));
@@ -379,7 +436,9 @@ int runMD5(struct Node* node, const char *fPath) {
 
 	if (node->next != NULL)
 		runMD5(node->next, fPath);
+		return 0;
 }
+
 
 void runCmd(struct Node* node, const char *fPath) {
 	//Run the commands for each node in parallel
@@ -391,36 +450,41 @@ void runCmd(struct Node* node, const char *fPath) {
 	if (node->command != NULL) {
 		char buf[2048];
 		memset(buf, 0, sizeof(buf));
+		if (node->statusFlag == 0) {
 
-		char *sourceExt = strchr(node->nodeName, '.');
-		if (sourceExt != NULL) {
+			char *sourceExt = strchr(node->nodeName, '.');
+			if (sourceExt != NULL) {
 
-			if ((strcmp(sourceExt, ".cpp") == 0) || (strcmp(sourceExt, ".o")
-					== 0))
-				resetCommand(node, fPath);
-		} else {
+				if ((strcmp(sourceExt, ".cpp") == 0)
+						|| (strcmp(sourceExt, ".o") == 0))
+					resetCommand(node, fPath);
+			} else {
 
-			//Need to fix other string and remove ""
-			const char *src = strrchr(node->command, 'g');
-			if (src != NULL) {
-				//src--;
-				const char *dsc = strrchr(src, '"');
-				int endl = dsc - src;
-				char* iptr = (char*) malloc(endl + 1);
-				memset(iptr, 0, endl);
-				memcpy(iptr, src, endl);
-				iptr[endl] = 0;
-				node->command = iptr;
+				//Need to fix other string and remove ""
+				const char *src = strrchr(node->command, 'g');
+				if (src != NULL) {
+					//src--;
+					const char *dsc = strrchr(src, '"');
+					int endl = dsc - src;
+					char* iptr = (char*) malloc(endl + 1);
+					memset(iptr, 0, endl);
+					memcpy(iptr, src, endl);
+					iptr[endl] = 0;
+					node->command = iptr;
+				}
 			}
+
+			sprintf(buf, "%s", node->command);
+
+			if (createThread(buf, &pt))
+				return NULL;
+			node->statusFlag = 1;
+			treeSearchDups(node, node->nodeName, node->command);
+
+
+			if (node->next != NULL)
+				runCmd(node->next, fPath);
 		}
-
-		sprintf(buf,"%s", node->command);
-
-		if (createThread(buf, &pt))
-			return 1;
-
-		if (node->next != NULL)
-			runCmd(node->next, fPath);
 	}
 
 }
@@ -429,9 +493,9 @@ struct Node* readFile(const char *filename, const char *target,	const char *fPat
 	//Read in remodelfile and check for new target
 	char lineBuf[2048];
 	struct Node* root = NULL;
-	FILE *file = fopen(filename, "rb");
+	FILE *file = fopen(filename, "r");
 	if (!file) {
-		printf("Could not open file\n");
+		printf("Could not open remodelfile\n");
 		abort();
 	} else {
 		//Read first line
@@ -453,12 +517,10 @@ struct Node* readFile(const char *filename, const char *target,	const char *fPat
 		if (target != NULL)
 			resetTarget(target, root);
 
-
 		char *dirName = ".remodel";
 		char *fileName = ".remodel/md5.txt";
-		struct stat *st;
+		struct stat st;
 
-		st = malloc(sizeof(struct stat));
 
 		if (stat(dirName, &st) == 0) {
 			printf(".remodel is present\n");
@@ -470,15 +532,37 @@ struct Node* readFile(const char *filename, const char *target,	const char *fPat
 			printf(".remodel/md5.txt is present\n");
 			FILE *cmd = popen("md5sum -c .remodel/md5.txt", "r");
 			char result[2048];
-			while (fgets(result, sizeof(result), cmd) != NULL)
+			memset(result, 0, sizeof(result));
+			setStatus(root);
+
+			while (fgets(result, sizeof(result), cmd) != NULL) {
 				printf("%s\n", result);
+
+				if (result != NULL) {
+
+					char *sName = strrchr(result, '/');
+					sName++;
+					char *eName = strrchr(result, ':');
+					int namel = eName - sName;
+					char nameValue[256];
+					memset(nameValue, 0, sizeof(nameValue));
+					memcpy(nameValue, sName, namel);
+
+					char *fStatus = strchr(result, "F");
+					if (fStatus != NULL) {
+						if (strcmp(fStatus, "F") == 0) {
+							if (treeSearch(root, nameValue) != 0)
+								printf("File name not found");
+						}
+					}
+
+				}
+
+			}
+
 			pclose(cmd);
-
-			// run a parser on the array and only look for FAIL results
-			// If failed result is found get filename
-			// set the statusFlag for each nodeName found
-
 			runCmd(root, fPath);
+			counter = 0;
 			runMD5(root, fPath);
 
 		} else {
@@ -487,12 +571,12 @@ struct Node* readFile(const char *filename, const char *target,	const char *fPat
 			runMD5(root, fPath);
 
 		}
+
 		//free(st);
 	}
 	fclose(file);
 	return root;
 }
-
 
 
 

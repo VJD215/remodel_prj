@@ -22,22 +22,25 @@ int main(int argc, char *argv[]) {
 		int pathSize = strlen(argv[0]);
 		char *relStart = argv[0];
 		char *fName = strrchr(argv[0], '/');
-		*fName++;
+		fName++;
 		int fNameSize = strlen(fName);
 		char *fPath = (char*) malloc(pathSize + 1);
+		memset(fPath, 0, pathSize);
 		memcpy(fPath, relStart, pathSize - fNameSize);
 		*(fPath + pathSize - fNameSize) = 0;
 
 		if (strcmp(fName, "remodel") != 0) {
 			//Looking for command remodel
-			printf("Wrong command\n");
+			printf("Looking for command remodel space remodelfile\n");
 
 		}
 
 		//Create graph and hash data. Optional to pass new target
-		readFile(argv[1], argv[2], fPath);
+		if (readFile(argv[1], argv[2], fPath) ==0)
+			printf("Failed");
 
 	}
-
+			printf("Process complete");
+			return 0;
 }
 

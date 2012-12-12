@@ -14,7 +14,7 @@ struct Node
 {
     char *nodeName;
     char *MD5HashValue;
-    char *statusFlag;
+    int statusFlag;
     struct Node *parentNode;
     struct Node *child;
     struct Node *next;
