@@ -167,7 +167,7 @@ struct Node* createSubTree(FILE* file) {
 
 	char *target;
 	char **dependency;
-	int numChild;
+	int numChild = 0;
 	char *command;
 	if (parse(lineBuf, &target, &dependency, &numChild, &command) != 0)
 		return NULL;
@@ -179,7 +179,7 @@ struct Node* createSubTree(FILE* file) {
 	subRoot->parentNode = NULL;
 	subRoot->command = command;
 	//Create the children below and siblings
-	int i;
+	int i = 0;
 	struct Node *last = NULL;
 	for (i = 0; i < numChild; i++) {
 		struct Node *childNode = (struct Node *) malloc(sizeof(struct Node));
@@ -238,16 +238,13 @@ int addSubTreeToParent(struct Node *subTree, struct Node *parent)
 }
 
 void setStatus(struct Node* node) {
+	node->statusFlag = 1;
 
 	if (node->child != NULL)
 		setStatus(node->child);
 
-	if (node->statusFlag == 0) {
-		node->statusFlag = 1;
-
-		if (node->next != NULL)
-			setStatus(node->next);
-	}
+	if (node->next != NULL)
+		setStatus(node->next);
 
 }
 
@@ -255,7 +252,8 @@ void setStatus(struct Node* node) {
 void resetTarget(const char* targetName, struct Node* root)
 {
 	//Change target name
-	int size = strlen(targetName);
+	int size = 0;
+	size = strlen(targetName);
 	char* oldName = root->nodeName;
 	root->nodeName = (char*)malloc(size + 1);
 	memcpy(root->nodeName, targetName, size);
@@ -263,12 +261,15 @@ void resetTarget(const char* targetName, struct Node* root)
 	//Change target command
 	if (root->command != NULL)
 	{
+		int ln1 =0;
+		int newSize = 0;
+
 		//Need to find starting point and replace name with new one
 		char* p1 = strstr(root->command, oldName);
 		if (p1 != NULL)
 		{
-			int ln1 = strlen(root->command);
-			int newSize = ln1 + size - strlen(oldName);
+			ln1 = strlen(root->command);
+			newSize = ln1 + size - strlen(oldName);
 			char* ptr = (char*)malloc(newSize + 1);
 			memcpy(ptr, root->command, p1 - root->command);
 			memcpy(ptr + (p1 - root->command), targetName, size);
@@ -288,63 +289,75 @@ void resetTarget(const char* targetName, struct Node* root)
 int treeSearch(struct Node* node, char * nameValue) {
 	if (strcmp(node->nodeName, nameValue) == 0) {
 		node->statusFlag = 0;
-		while (1) {
-			if (node->parentNode != NULL) {
+		while (node->parentNode != NULL) {
+			if (node->nodeName != NULL) {
 				node->statusFlag = 0;
 				return 0;
 			}
 		}
-
 	}
 
-if (node->child != NULL) {
-	if (treeSearch(node->child, nameValue) == 0)
-	return 0;
-}
-
-if (node->next != NULL) {
-	if (treeSearch(node->next, nameValue) == 0)
-	return 0;
-}
-
-return 1;
-}
-
-int treeSearchDups(struct Node* node, char *name, char *command) {
-	if (strcmp(node->nodeName, name) && strcmp(node->command, command)!=0) {
-		node->statusFlag = 1;
-		printf("Duplicate found not processing %s\n", node->nodeName);
-
+	if (node->child != NULL) {
+		if (treeSearch(node->child, nameValue) == 0)
+			return 0;
 	}
 
-if (node->child != NULL) {
-	if (treeSearch(node->child, name) == 0)
-	return 0;
+	if (node->next != NULL) {
+		if (treeSearch(node->next, nameValue) == 0)
+			return 0;
+	}
+
+	return 1;
 }
 
-if (node->next != NULL) {
-	if (treeSearch(node->next, name) == 0)
-	return 0;
-}
+int treeSearchDups(struct Node* node, char *name, int status, char *command) {
+	if (node->nodeName != NULL) {
+		if (strcmp(node->nodeName, name) == 0) {
+			if (node->command != NULL) {
+				if (strcmp(node->command, command) == 0) {
+					if (node->statusFlag == 1) {
+						status = 1;
+						printf("Duplicate found not processing %s\n",
+								node->nodeName);
+					}
+					return 0;
+				}
+			}
 
-return 1;
+		}
+	}
+
+	if (node->child != NULL) {
+		if (treeSearchDups(node->child, name, status, command) == 0)
+			return 0;
+	}
+
+	if (node->next != NULL) {
+		if (treeSearchDups(node->next, name, status, command) == 0)
+			return 0;
+	}
+
+	return 1;
 }
 
 
 void resetCommand(struct Node* node, const char *fPath) {
 	//Add path to file
 	//Need to find starting point in g++ -c fileName.cpp
-	int pl = strlen(fPath);
+	int pl = 0;
+	int nameSize = 0;
+	int cl = 0;
+	pl = strlen(fPath);
 
 	if (node->command != NULL) {
 		char *ptr = node->nodeName;
 		char *getName = strrchr(node->nodeName, '.');
-		int nameSize = getName - ptr;
+		nameSize = getName - ptr;
 		char *searchName = (char*) malloc(nameSize);
 		memset(searchName, 0, sizeof(nameSize));
 		memcpy(searchName, ptr, nameSize);
 		//Find starting point in command
-		int cl = strlen(node->command);
+		cl = strlen(node->command);
 		char *ptr1 = node->command;
 		char *start = ptr1;
 
@@ -354,12 +367,17 @@ void resetCommand(struct Node* node, const char *fPath) {
 			if (*ptr1 == 'c')
 				ptr1++;
 		}
+		int newSize = 0;
+		int cPt = 0;
+		int endl = 0;
+		int cmdl = 0;
+
 		if (ptr1 != NULL) {
 
-			int newSize = pl + cl;
+			newSize = pl + cl;
 			char* ptr2 = (char*) malloc(newSize + 1);
 			memset(ptr2, 0, sizeof(node->command + 1));
-			int cPt = ptr1 - start - nameSize;
+			cPt = ptr1 - start - nameSize;
 			memcpy(ptr2, node->command, cPt);
 
 			char *getName2 = strrchr(ptr2, '"');
@@ -368,12 +386,12 @@ void resetCommand(struct Node* node, const char *fPath) {
 			char *getName1 = strrchr(ptr1, '"');
 			getName1--;
 
-			int endl = getName1 - ptr1;
+			endl = getName1 - ptr1;
 			char* ptr4 = (char*) malloc(endl + 1);
 			memset(ptr4, 0, (endl + 1));
 			memcpy(ptr4, ptr1, endl + 1);
 
-			int cmdl = strlen(getName) + pl + strlen(searchName) + strlen(ptr4);
+			cmdl = strlen(getName) + pl + strlen(searchName) + strlen(ptr4);
 
 			char* ptr3 = (char*) malloc(cmdl + 1);
 			memset(ptr3, 0, sizeof(cmdl + 1));
@@ -451,6 +469,11 @@ void runCmd(struct Node* node, const char *fPath) {
 		char buf[2048];
 		memset(buf, 0, sizeof(buf));
 		if (node->statusFlag == 0) {
+			if (treeSearchDups(node, node->nodeName, node->statusFlag,
+					node->command))
+				return 0;
+		}
+		if (node->statusFlag == 0) {
 
 			char *sourceExt = strchr(node->nodeName, '.');
 			if (sourceExt != NULL) {
@@ -462,10 +485,11 @@ void runCmd(struct Node* node, const char *fPath) {
 
 				//Need to fix other string and remove ""
 				const char *src = strrchr(node->command, 'g');
+				int endl = 0;
 				if (src != NULL) {
 					//src--;
 					const char *dsc = strrchr(src, '"');
-					int endl = dsc - src;
+					endl = dsc - src;
 					char* iptr = (char*) malloc(endl + 1);
 					memset(iptr, 0, endl);
 					memcpy(iptr, src, endl);
@@ -479,8 +503,6 @@ void runCmd(struct Node* node, const char *fPath) {
 			if (createThread(buf, &pt))
 				return NULL;
 			node->statusFlag = 1;
-			treeSearchDups(node, node->nodeName, node->command);
-
 
 			if (node->next != NULL)
 				runCmd(node->next, fPath);
@@ -533,8 +555,9 @@ struct Node* readFile(const char *filename, const char *target,	const char *fPat
 			FILE *cmd = popen("md5sum -c .remodel/md5.txt", "r");
 			char result[2048];
 			memset(result, 0, sizeof(result));
+			//Set StatusFlag for all to 1
 			setStatus(root);
-
+			int namel = 0;
 			while (fgets(result, sizeof(result), cmd) != NULL) {
 				printf("%s\n", result);
 
@@ -543,16 +566,17 @@ struct Node* readFile(const char *filename, const char *target,	const char *fPat
 					char *sName = strrchr(result, '/');
 					sName++;
 					char *eName = strrchr(result, ':');
-					int namel = eName - sName;
+					namel = eName - sName;
 					char nameValue[256];
 					memset(nameValue, 0, sizeof(nameValue));
 					memcpy(nameValue, sName, namel);
 
 					char *fStatus = strchr(result, "F");
+					//char *nFile = strchr(result, "N");
 					if (fStatus != NULL) {
 						if (strcmp(fStatus, "F") == 0) {
 							if (treeSearch(root, nameValue) != 0)
-								printf("File name not found");
+								printf("Failed hash check");
 						}
 					}
 

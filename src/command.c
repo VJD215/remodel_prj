@@ -14,16 +14,19 @@
 
 int main(int argc, char *argv[]) {
 
+
+
 	if (argc < 2 && argc > 3) {
 		// remodel [remodelfile] and optional [target] should be arguments
 		printf("Please type correct syntax\n");
 	} else {
-
-		int pathSize = strlen(argv[0]);
+		int pathSize = 0;
+		pathSize = strlen(argv[0]);
 		char *relStart = argv[0];
 		char *fName = strrchr(argv[0], '/');
 		fName++;
-		int fNameSize = strlen(fName);
+		int fNameSize = 0;
+		fNameSize = strlen(fName);
 		char *fPath = (char*) malloc(pathSize + 1);
 		memset(fPath, 0, pathSize);
 		memcpy(fPath, relStart, pathSize - fNameSize);
